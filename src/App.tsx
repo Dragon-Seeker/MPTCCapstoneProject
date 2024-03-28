@@ -40,7 +40,7 @@ export function GameSelection() {
     <AppBody>
       <BaseLayout>
         <h2 className='p-2'>Hangman</h2>
-        <Button className='p-2' variant='primary'>Easy</Button>
+        <Button className='p-2' variant='success'>Easy</Button>
         <Button className='p-2' variant='danger'>Hard</Button>
       </BaseLayout>
     </AppBody>
