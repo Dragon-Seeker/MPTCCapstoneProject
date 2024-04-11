@@ -1,4 +1,4 @@
-import React, { Component, ReactNode } from 'react';
+import React, { Component, ReactElement, ReactNode } from 'react';
 import icon from './3274156.png';
 import './App.css';
 import { Button, Stack } from 'react-bootstrap';
@@ -22,7 +22,7 @@ export function GameLogin() {
       <BaseLayout>
         <h2 className='p-2'>Hangman</h2>
         <input className='p-2' type="text" placeholder='Name' id='name' name='game_login_input-name' required={true}/>
-        <input className='p-2' type="text" placeholder='Password' id='password' name='game_login_input-password' />
+        {/* <input className='p-2' type="text" placeholder='Password' id='password' name='game_login_input-password' /> */}
         <Button className='p-2' type="submit" id='login_button' variant='success' onClick={onLoginClick}>Login</Button>
       </BaseLayout>
     </AppBody>
@@ -95,18 +95,17 @@ export function GamePlay() {
   return (
     <div>
       <AppBody>
-        <Button variant='info' size='sm' onClick={onGamePlayBackClick} style={{ height: "40px", width: "40px", marginLeft: "20px", marginBottom: "20px" }} className="position-absolute bottom-0 start-0" title="Back to Signin!">
-          <FontAwesomeIcon icon={faCircleXmark} size='xl'/>
+        <Button color='blue' size='sm' onClick={onGamePlayBackClick} style={{ height: "40px", width: "40px", marginLeft: "20px", marginBottom: "20px" }} className="position-absolute bottom-0 start-0" title="Back to Signin!">
+          <FontAwesomeIcon icon={faCircleXmark} size='xl' color='white'/>
         </Button>
         <div className='Horizontal-Flow align-self-center'>
           <h2>
             WIP GAME PLAYER SPACE!
           </h2>
+          <MainButtonGrid/>
         </div>
       </AppBody>
-      
     </div>
-    
   )
 }
 
@@ -114,6 +113,37 @@ function onGamePlayBackClick(event: React.MouseEvent<HTMLButtonElement>){
   // TODO: Should be mode selection?
   root.render(<GameLogin />);
 }
+
+const alphabet = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"];
+
+function MainButtonGrid() {
+  var elements : ReactElement[] = new Array(alphabet.length)
+
+  alphabet.forEach((entry, index) => {
+    elements[index] = (
+      <Button onClick={(event) => onLetterButtonClick(event, index)} variant='success' style={{ height: "40px", width: "40px", margin: "6px"}}>
+        {entry}
+      </Button>
+    )
+  });
+  
+  var middlePoint = elements.length / 2;
+
+  var topRow = elements.slice(0, middlePoint);
+  var bottomRow = elements.slice(middlePoint, elements.length);
+
+  return (
+    <div className="col">
+      <div className="row" children={topRow}/>
+      <div className="row" children={bottomRow}/>
+    </div>
+  )
+}
+
+function onLetterButtonClick(event: React.MouseEvent<HTMLButtonElement>, index: number){
+  console.log(alphabet[index] + " was just pressed!");
+}
+
 //--
 
 function AppBody(props: {children: ReactNode}) {
