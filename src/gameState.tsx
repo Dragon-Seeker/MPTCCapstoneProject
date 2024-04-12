@@ -6,6 +6,11 @@ export class HangManGameState {
     currentMode: DifficultyMode;
     currentWord: String | null = null;
 
+    guessResults: string = "";
+    guessedLetters: String[] = [];
+
+    numberOfGuesses: number = 0;
+
     constructor(userName: String, currentMode : DifficultyMode){
         this.userName = userName;
         this.currentMode = currentMode;

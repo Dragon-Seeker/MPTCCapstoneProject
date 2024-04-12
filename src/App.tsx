@@ -14,7 +14,10 @@ import { HangManGameState, DifficultyMode } from './gameState';
 import { StackDirection } from 'react-bootstrap/esm/Stack';
 import { JsxElement } from 'typescript';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCircleXmark } from '@fortawesome/free-regular-svg-icons';
+import { faCircleXmark, IconLookup, IconName, IconPrefix } from '@fortawesome/free-regular-svg-icons';
+import { faA } from '@fortawesome/free-solid-svg-icons';
+import * as FA_SolidSVG from '@fortawesome/free-solid-svg-icons';
+import { IconProp, SizeProp } from '@fortawesome/fontawesome-svg-core';
 
 export function GameLogin() {
   var test = (
@@ -115,29 +118,50 @@ function onGamePlayBackClick(event: React.MouseEvent<HTMLButtonElement>){
 }
 
 const alphabet = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"];
+const svgIcons = [FA_SolidSVG["faA"], FA_SolidSVG["faB"], FA_SolidSVG["faC"], FA_SolidSVG["faD"], FA_SolidSVG["faE"], FA_SolidSVG["faF"], FA_SolidSVG["faG"], FA_SolidSVG["faH"], FA_SolidSVG["faI"], FA_SolidSVG["faJ"], FA_SolidSVG["faK"], FA_SolidSVG["faL"], FA_SolidSVG["faM"], FA_SolidSVG["faN"], FA_SolidSVG["faO"], FA_SolidSVG["faP"], FA_SolidSVG["faQ"], FA_SolidSVG["faR"], FA_SolidSVG["faS"], FA_SolidSVG["faT"], FA_SolidSVG["faU"], FA_SolidSVG["faV"], FA_SolidSVG["faW"], FA_SolidSVG["faX"], FA_SolidSVG["faY"], FA_SolidSVG["faZ"]];
 
 function MainButtonGrid() {
   var elements : ReactElement[] = new Array(alphabet.length)
 
+  const { height, width } = useWindowDimensions();
+
+  var buttonSize = width < 800 ? "30px" : "40px";
+  var iconSize = width < 800 ? "sm" : "lg";
+  var iconYPos = width < 800 ? "40" : "50";
+  
   alphabet.forEach((entry, index) => {
     elements[index] = (
-      <Button onClick={(event) => onLetterButtonClick(event, index)} variant='success' style={{ height: "40px", width: "40px", margin: "6px"}}>
-        {entry}
+      <Button className='Horizontal-Flow align-self-center' onClick={(event) => onLetterButtonClick(event, index)} variant='success' style={{ height: buttonSize, width: buttonSize, margin: "6px"}} key={index}>
+        <FontAwesomeIcon icon={svgIcons[index]} size={iconSize as SizeProp} className={`position-relative top-${iconYPos} start-50 translate-middle`}/>
       </Button>
     )
   });
   
-  var middlePoint = elements.length / 2;
+  if(width < 800) {
+    var rowElements : ReactElement[] = new Array(4)
+  
+    var chuckSize = 9;
 
-  var topRow = elements.slice(0, middlePoint);
-  var bottomRow = elements.slice(middlePoint, elements.length);
+    for(let i = 0; i < 3; i++) {
+      var rowChildren = elements.slice(i * chuckSize, Math.min((i + 1) * chuckSize, alphabet.length));
 
-  return (
-    <div className="col">
-      <div className="row" children={topRow}/>
-      <div className="row" children={bottomRow}/>
-    </div>
-  )
+      rowElements[i] = (<div className="row" children={rowChildren} key={i}/>)
+    }
+  
+    return (<div className="col align-middle" children={rowElements}/>)
+  } else {
+    var middlePoint = elements.length / 2;
+
+    var topRow = elements.slice(0, middlePoint);
+    var bottomRow = elements.slice(middlePoint, elements.length);
+  
+    return (
+      <div className="col">
+        <div className="row" children={topRow}/>
+        <div className="row" children={bottomRow}/>
+      </div>
+    )
+  }
 }
 
 function onLetterButtonClick(event: React.MouseEvent<HTMLButtonElement>, index: number){
@@ -149,7 +173,7 @@ function onLetterButtonClick(event: React.MouseEvent<HTMLButtonElement>, index: 
 function AppBody(props: {children: ReactNode}) {
   return (
     <div className="App">
-      <div className="App-body d-flex h-100 justify-content-center " children={props.children}/>
+      <div className="App-body d-flex h-100 justify-content-center" children={props.children}/>
     </div>
   )
 }
