@@ -1,19 +1,16 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
-import { useState, useEffect } from 'react';
 import reportWebVitals from './reportWebVitals';
 
 import { GameLogin, GameSelection } from './App';
-import { HangManGameState, DifficultyMode } from './gameState';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 
-var gameState = HangManGameState.fromSession();
 
-if(gameState == null) {
+if(localStorage.getItem("hangman_user_name") == null) {
   root.render(
     <React.StrictMode>
       <GameLogin />
@@ -32,4 +29,4 @@ if(gameState == null) {
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
 
-export default root;
+export {root};
