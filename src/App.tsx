@@ -138,11 +138,13 @@ export function GamePlay(props: {passedGameState: HangManGameState}) {
   function onTextAreaEnter(textArea: HTMLInputElement) {
     var state = getState();
 
-    if(state.getCurrentCondition() != 0) {
+    var currentGuess = textArea.value.toLowerCase();
+
+    if(state.getCurrentCondition() != 0 || (!currentGuess.replace(/\s/g, '').length)) {
       return;
     }
   
-    if(state.currentWord?.toLowerCase() != textArea.value.toLowerCase()) {
+    if(state.currentWord?.toLowerCase() != currentGuess) {
       state.numberOfGuesses += 1;
     } else {
       state.guessResults = state.currentWord;
@@ -163,16 +165,7 @@ export function GamePlay(props: {passedGameState: HangManGameState}) {
   function GameEndElement() {
     var winCondition = getState()!.getCurrentCondition();
 
-    var elements : ReactElement[] = new Array(alphabet.length)
-
-    if(winCondition == 1) {
-      elements.push((<h3 key={0}>Gameover, You Lose!</h3>));
-      elements.push((<h3 key={1}>The word was: {getState().currentWord}</h3>));
-    } else if(winCondition == 2) {
-      elements.push((<h3 key={0}>Gameover, You Win!</h3>));
-    }
-
-    return (<div children={elements}/>)
+    return (winCondition == 0) ? null : (<h3>Gameover, You {(winCondition == 1) ? "Lose" : "Win"}!</h3>);
   }
 
   return (
@@ -186,8 +179,16 @@ export function GamePlay(props: {passedGameState: HangManGameState}) {
         </Button>
         <div className='Horizontal-Flow align-self-center align-content-center justify-content-center'>
           <GameEndElement/>
-          <h2 style={{ margin: "40px" }}> Guessing Result: {getState()!.guessResults} </h2>
-          <h3> Number Of Guess Left: {getState()!.guessesLeft()} </h3>
+          <h3 className='position-absolute top-0 start-50 translate-middle' style={{ marginTop: "60px"}}> 
+            {getState()!.guessesLeft()} remaining guesses!
+          </h3>
+          <div /* style={{height: "300px", width: "300px"}} */>
+            <canvas width={300} height={300} ref={(e) => {renderHangmanCanvas(e, getState()!)}}>
+            </canvas>
+          </div>
+          <h1 style={{ marginBottom: "20px", marginTop: "20px", letterSpacing: "3px"}}> 
+            {/* Guessing Result:  */}{getState().getCurrentCondition() == 1 ? getState().currentWord : getState()!.guessResults} 
+          </h1>
           <div className='d-flex justify-content-center align-middle' style={{ height: "40px", margin: "10px"}}>
             <input name='word_guess_input' onKeyDownCapture={(e) => { if(e.key == "Enter") onTextAreaEnter((e.currentTarget as HTMLInputElement));}} style={{ height: "40px", marginRight: "10px"}} disabled={(getState().getCurrentCondition() != 0)} ref={e => {if(e != null && getState().getCurrentCondition() != 0) e!.value = ""}}/>
             <Button className='p-2' type="submit" id='enter_button' variant={(getState().getCurrentCondition() != 0) ?  'secondary' : 'success'} style={{ height: "40px"}} onClick={(e) => onTextAreaEnter(e.currentTarget.ownerDocument.getElementsByName("word_guess_input")[0] as HTMLInputElement)}>Guess</Button>
@@ -197,6 +198,189 @@ export function GamePlay(props: {passedGameState: HangManGameState}) {
       </AppBody>
     </div>
   )
+}
+
+// Main method to render the hangman in a HTML canvas element
+function renderHangmanCanvas(e: HTMLCanvasElement | null, state: HangManGameState) {
+  if(e == null) return;
+
+  var ctx = e?.getContext('2d')!;
+  
+  ctx.clearRect(0, 0, e.width, e.height);
+
+  var centerX = e.width / 2;
+  var centerY = e.height / 2;
+
+  ctx.fillStyle = "#000000";
+  ctx.strokeStyle = "black";
+
+  var shownParts = new Array<String>();
+  var amountGuess = state.numberOfGuesses; 
+
+  if(state.getCurrentCondition() != 0) {
+    amountGuess = state.currentMode.maxNumberOfGuess
+  }
+
+  if(state.currentMode == DifficultyMode.EASY) {
+    if(amountGuess > 0) shownParts.push("head");
+    if(amountGuess > 1) shownParts.push("body");
+    if(amountGuess > 2) shownParts.push("left_arm");
+    if(amountGuess > 3) shownParts.push("right_arm");
+    if(amountGuess > 4) shownParts.push("left_leg");
+    if(amountGuess > 5) shownParts.push("right_leg");
+    if(amountGuess > 6) shownParts.push("mouth");
+    if(amountGuess > 7) shownParts.push("eyes");
+  } else {
+    if(amountGuess > 0) {
+      shownParts.push("head");
+      shownParts.push("body");
+    }
+    if(amountGuess > 1) {
+      shownParts.push("left_arm");
+      shownParts.push("right_arm");
+    }
+    if(amountGuess > 2) {
+      shownParts.push("left_leg");
+      shownParts.push("right_leg");
+    }
+    if(amountGuess > 3) {
+      shownParts.push("mouth");
+      shownParts.push("eyes");
+    }
+  }
+
+  { // Dev Box
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, e.height);
+    ctx.lineTo(e.width, e.height);
+    ctx.lineTo(e.width, 0);
+    ctx.lineTo(0, 0);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+
+  ctx.strokeStyle = "#4f607d"; // color
+  ctx.fillStyle = "#4f607d";
+
+  var centerHeadX = centerX;
+  var centerHeadY = centerY - 50;
+
+  if(shownParts.includes("head")) { // Head
+    ctx.beginPath();
+    //ctx.fillStyle = "#0000ff"; // #ffe4c4
+    ctx.arc(centerHeadX, centerHeadY, 25, 0, Math.PI * 2); 
+    ctx.fill();
+  }
+
+  if(shownParts.includes("body")) { // Body
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY - 50);
+    ctx.lineTo(centerX, centerY + 60);
+    ctx.lineWidth = 10;
+    // ctx.strokeStyle = "navy";
+    ctx.stroke();
+  }
+
+  {
+    ctx.beginPath();
+    // ctx.strokeStyle = "pink"; 
+    if(shownParts.includes("right_arm")) { //Left Arm
+      ctx.moveTo(centerX, centerY - 20);
+      ctx.lineTo(centerX + 50, centerY);
+    }
+    if(shownParts.includes("left_arm")) { //Right Arm
+      ctx.moveTo(centerX, centerY - 20);
+      ctx.lineTo(centerX - 50, centerY);
+    }
+    ctx.stroke();
+  }
+    
+
+  { // Legs
+    var startY = centerY + 100;
+
+    ctx.beginPath();
+    // ctx.strokeStyle = "pink"; 
+    if(shownParts.includes("right_leg")) { //Left leg
+      ctx.moveTo(centerX, startY - 45);
+      ctx.lineTo(centerX + 40, startY);
+    }
+    if(shownParts.includes("left_leg")) { //Right Leg
+      ctx.moveTo(centerX, startY - 45);
+      ctx.lineTo(centerX - 40, startY);
+    }
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = "#000000";
+  ctx.strokeStyle = "black";
+
+  if(state.getCurrentCondition() == 2){
+     { // Derpy Face
+      var centerHeadX = centerX;
+      var centerHeadY = centerY - 50;
+      ctx.beginPath();
+      ///ctx.strokeStyle = "blue"; // color
+      ctx.lineWidth = 2;
+      ctx.arc(centerHeadX, centerHeadY, 18,  Math.PI / 6, Math.PI * (5 / 6), false); // draw semicircle for smiling
+      ctx.stroke();
+
+      ctx.beginPath();
+      //ctx.fillStyle = "green"; // color
+      ctx.arc(centerHeadX - 20, centerHeadY, 3, 0, Math.PI * 2, true); // draw left eye
+      ctx.fill();
+      ctx.arc(centerHeadX + 20, centerHeadY, 3, 0, Math.PI * 2, true); // draw right eye
+      ctx.fill();
+    } 
+  } else {
+    if(shownParts.includes("mouth")) {
+      ctx.beginPath();
+      ctx.lineWidth = 2;
+      ctx.translate(centerHeadX, centerHeadY);
+      ctx.rotate(180 * Math.PI / 180);
+      ctx.arc(0, -25, 18,  Math.PI / 6, Math.PI * (5 / 6), false); // draw semicircle for smiling
+      ctx.stroke();
+  
+      ctx.resetTransform();
+      // ctx.beginPath();
+      // ctx.arc(centerHeadX - 13, centerHeadY - 4, 3, 0, Math.PI * 2, true); // draw left eye
+      // ctx.fill();
+      // ctx.arc(centerHeadX + 13, centerHeadY - 4, 3, 0, Math.PI * 2, true); // draw right eye
+      // ctx.fill();
+    }
+  
+    if(shownParts.includes("eyes")) {
+      {
+        var eyeCenterX = centerHeadX - 13;
+        var eyeCenterY = centerHeadY - 4;
+  
+        ctx.beginPath();
+        var size = 5;
+        ctx.moveTo(eyeCenterX - size, eyeCenterY - size);
+        ctx.lineTo(eyeCenterX + size, eyeCenterY + size);
+        ctx.moveTo(eyeCenterX + size, eyeCenterY - size);
+        ctx.lineTo(eyeCenterX - size, eyeCenterY + size);
+        ctx.stroke();
+      }
+  
+      {
+        var eyeCenterX = centerHeadX + 13;
+        var eyeCenterY = centerHeadY - 4;
+  
+        ctx.beginPath();
+        var size = 5;
+        ctx.moveTo(eyeCenterX - size, eyeCenterY - size);
+        ctx.lineTo(eyeCenterX + size, eyeCenterY + size);
+        ctx.moveTo(eyeCenterX + size, eyeCenterY - size);
+        ctx.lineTo(eyeCenterX - size, eyeCenterY + size);
+        ctx.stroke();
+      }
+    }
+  }
+
+  //context.fillRect(20, 20, 80, 80);
 }
 
 const alphabet = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"];

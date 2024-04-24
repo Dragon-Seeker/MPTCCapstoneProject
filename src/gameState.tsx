@@ -93,7 +93,6 @@ export class HangManGameState {
     }
 
     public toStorage() {
-        console.log(this)
         localStorage.setItem(HangManGameState.STORAGE_KEY, JSON.stringify(this, replacer));
     }
 }
