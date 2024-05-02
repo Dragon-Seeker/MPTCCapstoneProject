@@ -7,8 +7,8 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'https://kit.fontawesome.com/ddf6e20b43.js';
 
 import { root } from './index';
-import { useWindowDimensions } from './windowutils';
-import { HangManGameState, DifficultyMode } from './gameState';
+import { getElementTyped, useWindowDimensions } from './GeneralUtils';
+import { HangManGameState, DifficultyMode } from './GameState';
 
 import { StackDirection } from 'react-bootstrap/esm/Stack';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -17,6 +17,7 @@ import { SizeProp } from '@fortawesome/fontawesome-svg-core';
 import { faBackward } from '@fortawesome/free-solid-svg-icons';
 
 import { useState } from 'react';
+import { WordData, WordSet } from './WordConfig';
 
 // Create GameLogin page with the name and button for login in
 export function GameLogin() {
@@ -24,20 +25,16 @@ export function GameLogin() {
     <AppBody>
       <BaseLayout>
         <h2 className='p-2'>Hangman</h2>
-        <input className='p-2' type="text" placeholder='Name' id='name' name='game_login_input-name' required={true}/>
+        <input className='p-2' type="text" placeholder='Name' id='name' name='game_login_input-name' required={true} onKeyDownCapture={(e) => { if(e.key == "Enter") onLoginEnter((e.currentTarget as HTMLInputElement));}}/>
         {/* <input className='p-2' type="text" placeholder='Password' id='password' name='game_login_input-password' /> */}
-        <Button className='p-2' type="submit" id='login_button' variant='success' onClick={onLoginClick}>Login</Button>
+        <Button className='p-2' type="submit" id='login_button' variant='success' onClick={(e) => onLoginEnter(e.currentTarget.ownerDocument.getElementsByName("game_login_input-name")[0] as HTMLInputElement)}>Login</Button>
       </BaseLayout>
     </AppBody>
   );
 }
 
 // Method used to validate that the input element desired has a valid input before moving to Game Selection
-function onLoginClick(event: React.MouseEvent<HTMLButtonElement>){
-  var button = event.currentTarget
-
-  var inputElement = button.ownerDocument.getElementsByName("game_login_input-name")[0] as HTMLInputElement;
-
+function onLoginEnter(inputElement: HTMLInputElement){
   if(!inputElement.checkValidity()) {
     inputElement.reportValidity();
     return;
@@ -52,11 +49,39 @@ function onLoginClick(event: React.MouseEvent<HTMLButtonElement>){
 
 // method used to create the game selection screen with the choices being easy or hard
 export function GameSelection() {
+  const [wordDataState, setWordDataState] = useState(new Array(WordData.fromStorage()));
+
+  function setState(state: WordData | null) {
+    setWordDataState(new Array(state));
+
+    //console.log("Attempting to setState: " + state);
+    state?.toStorage();
+  }
+
+  function getState() : WordData | null {
+    return wordDataState[0];
+  }
+
+  var fileData = getState() != null ? setFileFrom(getState()!.toJSONString()) : null;
+
+  var fileDataExists = fileData != null;
+  
+  //console.log(WordData.fromStorage()?.toJSONString());
+
   return (
     <AppBody>
       <Button color='blue' size='sm' onClick={onGameModeBackClick} style={{ height: "40px", width: "40px", marginLeft: "20px", marginBottom: "20px" }} className="position-absolute bottom-0 start-0" title="Back to Login!">
         <FontAwesomeIcon icon={faBackward} size='xl' color='white'/>
       </Button>
+      <Stack direction='horizontal' style={{ marginRight: "20px", marginBottom: "20px", fontSize: 13 }} className="position-absolute bottom-0 end-0">
+        <input type="file" id="xxx" name="xxx" accept=".json,.txt" style={{width: "65px", marginRight: "10px" }} className="position-relative top-90" onChange={(e) => onUploadEvent(e, setState)}/>
+        <Button title={(fileDataExists) ? "Download Data: " + fileData?.[1] : ""} variant={fileDataExists ? "info" : "secondary"} onClick={downloadFile} style={{height: "40px", width: "40px"}} disabled={!fileDataExists}>
+          <FontAwesomeIcon icon={FA_SolidSVG.faFile} size='lg' color='white' /* className="position-relative top-90 start-50 translate-middle"  *//>
+        </Button>
+        <a id="link" href={fileData?.[0]} download={fileData?.[1]} hidden={true}>link to your file (upload a file first)</a>
+        {/* <p style={{height: "20px", width: "40px"}}>{getState()?.toJSONString()}</p> */}
+      </Stack>
+      {createThemeSelections(getState())}
       <BaseLayout>
         <h2 className='p-2'>Hangman</h2>
         <Button className='p-2' variant='success' name='easy' onClick={onGameModeClick}>Easy</Button>
@@ -70,10 +95,89 @@ export function GameSelection() {
   )
 }
 
+function createThemeSelections(wordData: WordData | null) {
+  var userData = HangManGameState.fromStorage();
+
+  var selectedTheme = userData != null ? userData?.selectedTheme! : "";
+
+  var themes = wordData?.themes != null ? wordData?.themes : new Map();
+
+  console.log("Selected Theme: " + selectedTheme);
+
+  if(!themes.has(selectedTheme)) selectedTheme = "any";
+
+  var children: ReactElement[] = new Array((wordData != null ? themes.size : 0) + 1);
+
+  children[0] = (<option value="any" key="0" /* selected={selectedTheme == ""} */>Any</option>);
+
+  var index: number = 1;
+
+  console.log("Selected Theme: " + selectedTheme);
+
+  themes.forEach((v, k, m) => {
+    children[index] = (<option value={k} key={index} /* selected={selectedTheme == k} */>{v.name}</option>);
+    index++;
+  })
+  
+  return (
+    <Stack id="theme_selection" direction='vertical' style={{fontSize: "16px", marginTop: "2px", marginBottom: "20px"}} className="position-absolute bottom-0 start-50 translate-middle">
+      <label htmlFor="themes" style={{marginBottom: "5px"}}>Choose a theme:</label>
+      <select name="themes" id="themes" defaultValue={selectedTheme} children={children}/>
+    </Stack>
+  )
+}
+
+function onUploadEvent(event: React.ChangeEvent<HTMLInputElement>, setter: (state: WordData | null) => void) {
+  var inputElement = event.target;
+  var doc = inputElement.ownerDocument;
+
+  var link = doc.getElementsByTagName('a')[0];
+
+  if(inputElement == null) return;
+
+  var objectURL = link.href;
+
+  if (objectURL) URL.revokeObjectURL(objectURL); // revoke the old object url to avoid using more memory than needed
+
+  const file = inputElement.files![0];
+  objectURL = URL.createObjectURL(file);
+
+  var fr = new FileReader();
+
+  fr.onload = function () {
+    var data = WordData.fromString(fr.result as string);
+
+    if(data != null) setter(data);
+
+    //console.log(data?.toString());
+    //console.log(WordData.fromStorage()?.toJSONString);
+  }
+
+  fr.readAsText(file);
+  
+  link.download = file.name; // this name is used when the user downloads the file
+  link.href = objectURL;
+}
+
+function setFileFrom(data: string) : [string, string] {
+  var blob = new Blob([data], {type: 'text/plain'});
+
+  return [window.URL.createObjectURL(
+    new File([blob], 'custom_word_data.json', {type: blob.type})
+  ), 'custom_word_data.json'];
+}
+
+function downloadFile(event: React.MouseEvent<HTMLButtonElement>) {
+  var link = event.currentTarget.ownerDocument.getElementsByTagName('a')[0];
+
+  link.click();
+}
+
 // Back function that takes you back to main menu and deletes storage for the game state
 function onGameModeBackClick(event: React.MouseEvent<HTMLButtonElement>){
   HangManGameState.deleteStorage();
   localStorage.removeItem("hangman_user_name");
+  WordData.deleteStorage();
 
   root.render(<GameLogin />);
 }
@@ -100,7 +204,7 @@ function onGameModeClick(event: React.MouseEvent<HTMLButtonElement>){
 
   if(button.name == "hard") selectedMode = DifficultyMode.HARD;
 
-  var currentUser = sessionStorage.getItem("hangman_user_name");
+  var currentUser = localStorage.getItem("hangman_user_name");
 
   if(currentUser == null) {
     // TODO: ADD ERROR INDICATING SOMETHING HAS OCCURRED
@@ -111,7 +215,18 @@ function onGameModeClick(event: React.MouseEvent<HTMLButtonElement>){
 
   var newGameState = new HangManGameState(currentUser, selectedMode);
 
-  newGameState.setNewWordFromArray(words);
+  var themeElement: HTMLSelectElement = getElementTyped("themes", button);
+
+  console.log("Selected options index: " + themeElement.selectedIndex);
+  console.log("Options Size: " + themeElement.selectedOptions.length)
+  console.log("Children Elements: " + themeElement.children.length);
+
+  var selectedTheme = themeElement.selectedOptions[0];
+
+  newGameState.setSelectedTheme(selectedTheme.value);
+
+  newGameState.setWordFromTheme();
+  // newGameState.setNewWordFromArray(words);
 
   root.render(<GamePlay passedGameState={newGameState}/>);
 }
@@ -157,7 +272,8 @@ export function GamePlay(props: {passedGameState: HangManGameState}) {
   function resetGame(event: React.MouseEvent<HTMLButtonElement>) {
     var state = getState();
 
-    state.setNewWordFromArray(words);
+    state.setWordFromTheme();
+    //state.setNewWordFromArray(words);
     setState(state);
   }
 
@@ -502,7 +618,7 @@ function setCharAt(str: string, index: number, chr: string) {
 // Helper method used to setup the main app body for theming purposes
 function AppBody(props: {children: ReactNode}) {
   return (
-    <div className="App">
+    <div className="App" /* style={{minHeight: "750px", minWidth: "400px"}} */>
       <div className="App-body d-flex h-100 justify-content-center" children={props.children}/>
     </div>
   )
@@ -514,11 +630,13 @@ function BaseLayout(props: {children: ReactNode}) {
 
   var columnMode = width < 800;
 
+  var heightToSmall = height > 650;
+
   return (
     <Stack direction={(columnMode ? 'vertical' : 'horizontal') as StackDirection} gap={10} className='Horizontal-Flow align-self-center'>
-      {(columnMode) ? <img src={icon} className='App-icon' alt='icon'/> : null}
+      {(columnMode && heightToSmall) ? <img src={icon} className='App-icon' alt='icon'/> : null}
       <Stack direction='vertical' gap={3} className='col-md-2.5 p-5 mx-auto w-10 align-self-start' children={props.children}/>
-      {(!columnMode) ? <img src={icon} className='App-icon' alt='icon'/> : null}
+      {(!columnMode && heightToSmall) ? <img src={icon} className='App-icon' alt='icon'/> : null}
     </Stack>
   )
 }

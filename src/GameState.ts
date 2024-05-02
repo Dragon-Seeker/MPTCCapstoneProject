@@ -1,3 +1,6 @@
+import { reviverForMap, replacerForMap } from "./GeneralUtils";
+import { WordData, WordSet } from "./WordConfig";
+
 export class HangManGameState {
     public static STORAGE_KEY = "hangman_game_state";
 
@@ -10,6 +13,8 @@ export class HangManGameState {
     guessedLetters: Map<string, number> = new Map();
 
     numberOfGuesses: number = 0;
+
+    selectedTheme: string | null = null;
 
     constructor(userName: String, currentMode : DifficultyMode){
         this.userName = userName;
@@ -41,6 +46,39 @@ export class HangManGameState {
         }
 
         return 0;
+    }
+
+    public setSelectedTheme(theme: string) {
+        this.selectedTheme = theme;
+
+        console.log(theme);
+    }
+
+    public getWordSet(): WordSet {
+        var wordData = WordData.fromStorage();
+
+        if(this.selectedTheme != null && wordData != null && wordData!.word_sets.has(this.selectedTheme)) {
+            return wordData?.word_sets.get(this.selectedTheme)!;
+        }
+
+        return WordSet.builtinSet
+    }
+
+    public setWordFromTheme() {
+        var wordSet = this.getWordSet();
+        
+        var words: Array<string> | null = null;
+
+        words = (this.currentMode == DifficultyMode.EASY) ? wordSet.easy :wordSet.hard;
+
+        if (words == null || words.length == 0) words = wordSet.easy;
+        if (words == null || words.length == 0) words = wordSet.hard;
+
+        if(words == null || words.length == 0) {
+            words = (this.currentMode == DifficultyMode.EASY) ? WordSet.builtinSet.easy : WordSet.builtinSet.hard;
+        }
+
+        this.setNewWordFromArray(words);
     }
 
     public setNewWordFromArray(words: string[]) {
@@ -78,9 +116,19 @@ export class HangManGameState {
 
         if(stateData == null) return null;
 
-        var stateJson = JSON.parse(stateData, reviver);
+        var stateJson: any;
+
+        try {
+            stateJson = JSON.parse(stateData, reviverForMap);
+        } catch(e: any) {
+            console.log(e);
+
+            return null;
+        }
 
         var stateObject = new HangManGameState(stateJson.userName, stateJson.currentMode);       
+
+        stateObject.selectedTheme = stateJson.selectedTheme;
 
         stateObject.currentWord = stateJson.currentWord;
 
@@ -93,29 +141,8 @@ export class HangManGameState {
     }
 
     public toStorage() {
-        localStorage.setItem(HangManGameState.STORAGE_KEY, JSON.stringify(this, replacer));
+        localStorage.setItem(HangManGameState.STORAGE_KEY, JSON.stringify(this, replacerForMap));
     }
-}
-
-function replacer(key: any, value: any) {
-    if(value instanceof Map) {
-        return {
-        dataType: 'Map',
-        value: Array.from(value.entries()), // or with spread: value: [...value]
-        };
-    } else {
-        return value;
-    }
-}
-
-function reviver(key: any, value: any) {
-    if(typeof value === 'object' && value !== null) {
-        if (value.dataType === 'Map') {
-            return new Map(value.value);
-        }
-    }
-
-    return value;
 }
 
 export class DifficultyMode {

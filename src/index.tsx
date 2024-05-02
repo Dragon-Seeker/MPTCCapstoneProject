@@ -9,7 +9,6 @@ const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 
-
 if(localStorage.getItem("hangman_user_name") == null) {
   root.render(
     <React.StrictMode>
