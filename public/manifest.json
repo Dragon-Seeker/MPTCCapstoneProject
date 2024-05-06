@@ -1,21 +1,21 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Hangman",
+  "name": "MPTC Hang Man Game",
   "icons": [
     {
-      "src": "favicon.ico",
+      "src": "game.ico",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
     },
     {
-      "src": "logo192.png",
+      "src": "gallows_icon.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "256x256"
     },
     {
-      "src": "logo512.png",
+      "src": "gallows_long_no_bg_icon.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "450x800"
     }
   ],
   "start_url": ".",

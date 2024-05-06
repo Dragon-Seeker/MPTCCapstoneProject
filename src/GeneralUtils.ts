@@ -6,6 +6,7 @@ function getWindowDimensions() {
   return { width, height };
 }
 
+// Method used to get the given window dimensions of the browser
 export function useWindowDimensions() {
   const [windowDimensions, setWindowDimensions] = useState(getWindowDimensions());
   
@@ -20,16 +21,10 @@ export function useWindowDimensions() {
   return windowDimensions;
 }
 
-type Foo = Map<string, number>;
+//--
 
-type MapKey<T> = T extends Map<infer K, any> ? K : never;
-type MapValue<T> = T extends Map<any, infer V> ? V : never;
-
+// Method used to properly serialize a map into json 
 export function replacerForMap(key: any, value: any) : any {
-  // if(value instanceof Map) {
-  //   //console.log(`Map Stringifyed [Key=${key}]: ` + value.get("tech"));
-  //   return { dataType: 'Map', values: new Array(value.entries())/* .map((tuple) => ({ key: tuple[0], value: tuple[1] })) */, /* or with spread: value: [...value] */};
-  // }
   if(value instanceof Map) {
     return Object.fromEntries(value.entries());
   }
@@ -64,6 +59,10 @@ function decode(key: string, value: any) {
   return value;
 }
 
+//--
+
+// Below are various helper methods for looking up elements within the passed element doc based on name
+
 export function getElementGetterTyped<T extends HTMLElement>(name: string, event: React.BaseSyntheticEvent<any, any, HTMLElement>) : T {
   return getElementTyped<T>(name, event.target);
 }
@@ -78,4 +77,14 @@ export function getElementTyped<T extends HTMLElement>(name: string, element: HT
 
 export function getElement(name: string, element: HTMLElement) : HTMLElement {
   return element.ownerDocument.getElementsByName(name)[0]
+}
+
+//--
+
+export function getTimeDiffCurrent(date: Date) : number {
+  return getTimeDiff(new Date(), date);
+}
+
+export function getTimeDiff(date1: Date, date2: Date) : number {
+  return Math.abs(date1.getTime() - date2.getTime()) / 1000
 }

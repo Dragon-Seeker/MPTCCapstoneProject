@@ -1,7 +1,6 @@
-import React, { Component, ReactElement, ReactNode, TextareaHTMLAttributes } from 'react';
-import icon from './3274156.png';
+import React, { Component, ReactElement, ReactNode, Suspense, TextareaHTMLAttributes, useEffect, useRef } from 'react';
 import './App.css';
-import { Button, Stack } from 'react-bootstrap';
+import { Button, Overlay, Stack } from 'react-bootstrap';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'https://kit.fontawesome.com/ddf6e20b43.js';
@@ -17,7 +16,8 @@ import { SizeProp } from '@fortawesome/fontawesome-svg-core';
 import { faBackward } from '@fortawesome/free-solid-svg-icons';
 
 import { useState } from 'react';
-import { WordData, WordSet } from './WordConfig';
+import { Theme, WordData, WordSet } from './WordConfig';
+import { getScoresFromDB, getThemes, getUserScoreFromDB, setUserScoreInDB } from './DatabaseAccess';
 
 // Create GameLogin page with the name and button for login in
 export function GameLogin() {
@@ -40,9 +40,11 @@ function onLoginEnter(inputElement: HTMLInputElement){
     return;
   }
 
+  sessionStorage.removeItem(highScoreKey);
+
   localStorage.setItem("hangman_user_name", inputElement.value);
 
-  root.render(<GameSelection />);
+  root.render(<GameSelection/>);
 }
 
 //--
@@ -81,7 +83,7 @@ export function GameSelection() {
         <a id="link" href={fileData?.[0]} download={fileData?.[1]} hidden={true}>link to your file (upload a file first)</a>
         {/* <p style={{height: "20px", width: "40px"}}>{getState()?.toJSONString()}</p> */}
       </Stack>
-      {createThemeSelections(getState())}
+      {CreateThemeSelections(getState())}
       <BaseLayout>
         <h2 className='p-2'>Hangman</h2>
         <Button className='p-2' variant='success' name='easy' onClick={onGameModeClick}>Easy</Button>
@@ -95,38 +97,74 @@ export function GameSelection() {
   )
 }
 
-function createThemeSelections(wordData: WordData | null) {
+// Method to create the given theme selection with a deferred methodology to handle datebase loading
+function CreateThemeSelections(wordData: WordData | null) {
   var userData = HangManGameState.fromStorage();
 
-  var selectedTheme = userData != null ? userData?.selectedTheme! : "";
+  const [themeData, setThemeData] = useState(new Array<[string, string]>(["any", "Any"])); //Key, Name
+  const [selectedTheme, setSelectedTheme] = useState(userData != null ? userData?.selectedTheme! : "");
+  
+  useEffect(() => {
+    async function getData() {
+      var dbThemes = await getThemes();
+      var userData = HangManGameState.fromStorage();
+  
+      var userSelectedTheme = userData != null ? userData?.selectedTheme! : "";
+    
+      var themes = new Map<string, Theme>(dbThemes);
 
-  var themes = wordData?.themes != null ? wordData?.themes : new Map();
+      themes.delete("default");
+    
+      var userThemes : Map<string, Theme> = new Map();
+  
+      var children = new Array<[string, string]>(0);
+  
+      children.push(["any", "Any"]);
+  
+      if(wordData?.themes != null) {
+        userThemes = wordData?.themes;
+    
+        wordData?.themes.forEach((v, k, m) => {
+          children.push([k, v.name]);
+        });
+      }
 
-  console.log("Selected Theme: " + selectedTheme);
+      children.push(["_divider", "none"]);
+    
+      themes.forEach((v, k, m) => {
+        children.push([k, v.name]);
+      })
+  
+      setThemeData(children); 
 
-  if(!themes.has(selectedTheme)) selectedTheme = "any";
+      if(!userThemes.has(userSelectedTheme) && !themes.has(userSelectedTheme)) setSelectedTheme("any");
+    
+      console.log("Selected Theme: " + userSelectedTheme);
+    }
 
-  var children: ReactElement[] = new Array((wordData != null ? themes.size : 0) + 1);
-
-  children[0] = (<option value="any" key="0" /* selected={selectedTheme == ""} */>Any</option>);
-
-  var index: number = 1;
-
-  console.log("Selected Theme: " + selectedTheme);
-
-  themes.forEach((v, k, m) => {
-    children[index] = (<option value={k} key={index} /* selected={selectedTheme == k} */>{v.name}</option>);
-    index++;
-  })
+    getData();
+  }, [])
   
   return (
     <Stack id="theme_selection" direction='vertical' style={{fontSize: "16px", marginTop: "2px", marginBottom: "20px"}} className="position-absolute bottom-0 start-50 translate-middle">
       <label htmlFor="themes" style={{marginBottom: "5px"}}>Choose a theme:</label>
-      <select name="themes" id="themes" defaultValue={selectedTheme} children={children}/>
+      <select name="themes" id="themes" defaultValue={selectedTheme}>
+        {
+          themeData.map((tuple, index, array) => {
+            if(tuple[0] == "_divider"){
+              //return (<option value={tuple[0]} key={index}>{tuple[1]}</option>)
+              return (<hr key={index}/>);
+            } else {
+              return (<option value={tuple[0]} key={index} selected={selectedTheme == tuple[0]}>{tuple[1]}</option>)
+            }
+          })
+        }
+      </select>
     </Stack>
   )
 }
 
+// Event hook for when a user uploads a file with the provided file input
 function onUploadEvent(event: React.ChangeEvent<HTMLInputElement>, setter: (state: WordData | null) => void) {
   var inputElement = event.target;
   var doc = inputElement.ownerDocument;
@@ -159,6 +197,7 @@ function onUploadEvent(event: React.ChangeEvent<HTMLInputElement>, setter: (stat
   link.href = objectURL;
 }
 
+// Method used to set a given file from a string returning the URL for the resource and the name of the file
 function setFileFrom(data: string) : [string, string] {
   var blob = new Blob([data], {type: 'text/plain'});
 
@@ -197,7 +236,7 @@ function onGameModeContinueClick(event: React.MouseEvent<HTMLButtonElement>){
 }
 
 // Method used when a game mode is selected and the game state will be setup and passed to the main game render object
-function onGameModeClick(event: React.MouseEvent<HTMLButtonElement>){
+async function onGameModeClick(event: React.MouseEvent<HTMLButtonElement>){
   var button = event.currentTarget;
 
   var selectedMode = DifficultyMode.EASY;
@@ -215,28 +254,22 @@ function onGameModeClick(event: React.MouseEvent<HTMLButtonElement>){
 
   var newGameState = new HangManGameState(currentUser, selectedMode);
 
-  var themeElement: HTMLSelectElement = getElementTyped("themes", button);
-
-  console.log("Selected options index: " + themeElement.selectedIndex);
-  console.log("Options Size: " + themeElement.selectedOptions.length)
-  console.log("Children Elements: " + themeElement.children.length);
-
-  var selectedTheme = themeElement.selectedOptions[0];
+  var selectedTheme = getElementTyped<HTMLSelectElement>("themes", button).selectedOptions[0];
 
   newGameState.setSelectedTheme(selectedTheme.value);
 
-  newGameState.setWordFromTheme();
-  // newGameState.setNewWordFromArray(words);
+  await newGameState.setWordFromTheme();
 
   root.render(<GamePlay passedGameState={newGameState}/>);
 }
 
 //--
 
-const words : string[] = ["test", "word", "name"]
+const highScoreKey = "RunningScoreKey";
 
 // Main method used to setup state manipulation for the game state and layout the rendering for the game
 export function GamePlay(props: {passedGameState: HangManGameState}) {
+  // State using a Array to get around the issue of pure reference equality for state, this is sort a no no and should be changed within the future
   const [currentGameState, setCurrentGameState] = useState(new Array(props['passedGameState']));
 
   function setState(state: HangManGameState) {
@@ -269,11 +302,11 @@ export function GamePlay(props: {passedGameState: HangManGameState}) {
   }
   
   // Helper function to reset the game by setting a new word and setting the state
-  function resetGame(event: React.MouseEvent<HTMLButtonElement>) {
+  async function resetGame(event: React.MouseEvent<HTMLButtonElement>) {
     var state = getState();
 
-    state.setWordFromTheme();
-    //state.setNewWordFromArray(words);
+    await state.setWordFromTheme();
+
     setState(state);
   }
 
@@ -281,26 +314,59 @@ export function GamePlay(props: {passedGameState: HangManGameState}) {
   function GameEndElement() {
     var winCondition = getState()!.getCurrentCondition();
 
-    return (winCondition == 0) ? null : (<h3>Gameover, You {(winCondition == 1) ? "Lose" : "Win"}!</h3>);
+    if(winCondition == 0) return null;
+
+    updateScore(getState()!);
+
+    return (<h3 className='position-absolute top-50 start-50 translate-middle'>Gameover, You {(winCondition == 1) ? "Lose" : "Win"}!</h3>);
+  }
+
+  // Function to parse the current session score
+  function GetTotalScore() : number {
+    return parseInt(sessionStorage.getItem(highScoreKey) ?? "0")/*  + ((getState()!.getCurrentCondition() == 0) ? getState().getCurrentWordScore() : 0) */;
+  }
+
+  // Function used to get the correct styled button based on game state
+  function GetGameResetBtn() {
+    if(getState()!.getCurrentCondition() == 0) {
+      return (
+        <Button variant='warning' size='sm' onClick={resetGame} style={{ height: "40px", width: "40px", marginRight: "20px", marginBottom: "20px"}} className="position-absolute bottom-0 end-0" title="Reset from beginning">
+          <FontAwesomeIcon icon={FA_SolidSVG.faRotateRight} size='xl' color='white'/>
+        </Button>
+      );
+    } else {
+      return (
+        <Button variant='success' size='sm' onClick={resetGame} style={{ height: "40px", width: "40px", marginRight: "20px", marginBottom: "20px"}} className="position-absolute bottom-0 end-0" title="Next Game">
+          <FontAwesomeIcon icon={FA_SolidSVG.faPlay} size='xl' color='white'/>
+        </Button>
+      );
+    }
   }
 
   return (
     <div>
       <AppBody>
-        <Button size='sm' onClick={(e) => root.render(<GameSelection />)} style={{ height: "40px", width: "40px", marginLeft: "20px", marginBottom: "20px" }} className="position-absolute bottom-0 start-0" title="Back to Mode Selection!">
+        <Button size='sm' onClick={async (e) => root.render(<GameSelection/>)} style={{ height: "40px", width: "40px", marginLeft: "20px", marginBottom: "20px" }} className="position-absolute bottom-0 start-0" title="Back to Mode Selection!">
           <FontAwesomeIcon icon={faBackward} size='xl' color='white'/>
         </Button>
-        <Button variant='warning' size='sm' onClick={resetGame} style={{ height: "40px", width: "40px", marginRight: "20px", marginBottom: "20px"}} className="position-absolute bottom-0 end-0" title="Reset from beginning">
-          <FontAwesomeIcon icon={FA_SolidSVG.faRotateRight} size='xl' color='white'/>
-        </Button>
+        <GetGameResetBtn/>
         <div className='Horizontal-Flow align-self-center align-content-center justify-content-center'>
           <GameEndElement/>
-          <h3 className='position-absolute top-0 start-50 translate-middle' style={{ marginTop: "60px"}}> 
+          <h3 className='position-absolute top-0 start-50 translate-middle' style={{ marginTop: "35px"}}> 
             {getState()!.guessesLeft()} remaining guesses!
           </h3>
-          <div /* style={{height: "300px", width: "300px"}} */>
-            <canvas width={300} height={300} ref={(e) => {renderHangmanCanvas(e, getState()!)}}>
-            </canvas>
+          <h4 className='position-absolute top-0 start-50 translate-middle' style={{ marginTop: "80px"}}>
+            Current Score: {getState()!.getCurrentWordScore()}
+          </h4>
+          <div className='' /* style={{height: "300px", width: "300px"}} */>
+            {
+              (getState()!.getCurrentCondition() != 2)
+                ? (<img className='position-absolute top-1 start-1 z-n1' src={process.env.PUBLIC_URL + '/assets/gallows_long_no_bg_icon.png'} style={{marginTop: "-50px", marginLeft: "-185px",  width: "215px"}}/>)
+                : null
+            }
+            <div >
+              <canvas width={300} height={300} ref={(e) => {renderHangmanCanvas(e, getState()!)}}/>
+            </div>
           </div>
           <h1 style={{ marginBottom: "20px", marginTop: "20px", letterSpacing: "3px"}}> 
             {/* Guessing Result:  */}{getState().getCurrentCondition() == 1 ? getState().currentWord : getState()!.guessResults} 
@@ -311,9 +377,33 @@ export function GamePlay(props: {passedGameState: HangManGameState}) {
           </div>
           <MainButtonGrid state={getState()}  setter={setState}/>
         </div>
+        <h5 className='position-absolute bottom-0 start-50 translate-middle' style={{ marginTop: "35px"}}> 
+          Total Score: {GetTotalScore()}
+        </h5>
       </AppBody>
     </div>
   )
+}
+
+// Async method used to update the score based on the current game state combined with the sessions score currently at
+async function updateScore(state: HangManGameState) {
+  var currentScoreString = sessionStorage.getItem(highScoreKey);
+
+  var currentScore : number = 0;
+
+  if(currentScoreString != null) {
+    currentScore = parseInt(currentScoreString);
+  }
+
+  currentScore += state.getCurrentWordScore();
+
+  sessionStorage.setItem(highScoreKey, currentScore.toString());
+
+  var userScoreFromDB = await getUserScoreFromDB(state.userName);
+
+  if(currentScore > userScoreFromDB){
+    await setUserScoreInDB(state.userName, currentScore)
+  }
 }
 
 // Main method to render the hangman in a HTML canvas element
@@ -365,17 +455,17 @@ function renderHangmanCanvas(e: HTMLCanvasElement | null, state: HangManGameStat
     }
   }
 
-  { // Dev Box
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(0, e.height);
-    ctx.lineTo(e.width, e.height);
-    ctx.lineTo(e.width, 0);
-    ctx.lineTo(0, 0);
-    ctx.stroke();
-    ctx.lineWidth = 1;
-  }
+  // { // Dev Box
+  //   ctx.lineWidth = 2;
+  //   ctx.beginPath();
+  //   ctx.moveTo(0, 0);
+  //   ctx.lineTo(0, e.height);
+  //   ctx.lineTo(e.width, e.height);
+  //   ctx.lineTo(e.width, 0);
+  //   ctx.lineTo(0, 0);
+  //   ctx.stroke();
+  //   ctx.lineWidth = 1;
+  // }
 
   ctx.strokeStyle = "#4f607d"; // color
   ctx.fillStyle = "#4f607d";
@@ -499,6 +589,7 @@ function renderHangmanCanvas(e: HTMLCanvasElement | null, state: HangManGameStat
   //context.fillRect(20, 20, 80, 80);
 }
 
+// Arrays used for easily accessing alphabetic characters from int values
 const alphabet = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"];
 const svgIcons = [FA_SolidSVG["faA"], FA_SolidSVG["faB"], FA_SolidSVG["faC"], FA_SolidSVG["faD"], FA_SolidSVG["faE"], FA_SolidSVG["faF"], FA_SolidSVG["faG"], FA_SolidSVG["faH"], FA_SolidSVG["faI"], FA_SolidSVG["faJ"], FA_SolidSVG["faK"], FA_SolidSVG["faL"], FA_SolidSVG["faM"], FA_SolidSVG["faN"], FA_SolidSVG["faO"], FA_SolidSVG["faP"], FA_SolidSVG["faQ"], FA_SolidSVG["faR"], FA_SolidSVG["faS"], FA_SolidSVG["faT"], FA_SolidSVG["faU"], FA_SolidSVG["faV"], FA_SolidSVG["faW"], FA_SolidSVG["faX"], FA_SolidSVG["faY"], FA_SolidSVG["faZ"]];
 
@@ -617,9 +708,64 @@ function setCharAt(str: string, index: number, chr: string) {
 
 // Helper method used to setup the main app body for theming purposes
 function AppBody(props: {children: ReactNode}) {
+  const [show, setShow] = useState(false);
+  const target = useRef(null);
+
   return (
     <div className="App" /* style={{minHeight: "750px", minWidth: "400px"}} */>
       <div className="App-body d-flex h-100 justify-content-center" children={props.children}/>
+      <Button color='blue' size='sm' ref={target} variant='success' onClick={() => setShow(!show)} style={{ height: "40px", width: "40px", marginRight: "20px", marginTop: "20px", visibility: (!show ? 'visible' : 'hidden') }} className="position-absolute top-0 end-0" title="Back to Login!">
+        <FontAwesomeIcon icon={FA_SolidSVG.faBook} size='xl' color='white'/>
+      </Button>
+      <Overlay target={target.current} show={show} placement="right">
+        {({ placement: _placement, arrowProps: _arrowProps, show: _show, popper: _popper, hasDoneInitialMeasure: _hasDoneInitialMeasure,}) => (
+          <div className="position-absolute top-0 start-0 vw-100 vh-100 z-1" style={{backgroundColor: 'rgba(0, 0, 0, 0.3)'}}>
+            <div className="position-absolute top-50 start-50 translate-middle h-50 p-3" style={{width: "360px", backgroundColor: 'rgba(200, 100, 45, 1)', color: 'white', borderRadius: 3}}>
+              <Button color='blue' size='sm' ref={target} onClick={() => setShow(!show)} style={{ height: "30px", width: "30px", marginRight: "20px", marginTop: "20px", visibility: (show ? 'visible' : 'hidden') }} className="position-absolute top-0 end-0" title="Back to Login!">
+                <FontAwesomeIcon icon={FA_SolidSVG.faClose} size='sm' color='white'/>
+              </Button>
+              <CreateScoreBoard/>
+            </div>
+          </div>
+        )}
+      </Overlay>
+  </div>
+  )
+}
+
+// Function used to create the scoreboard element within the apps overlay
+function CreateScoreBoard() {
+  const [scores, setScores] = useState<Array<[string, number]> | null>(null); //Name, Score
+  
+  useEffect(() => {
+    async function getData() { setScores(await getScoresFromDB()); }
+
+    getData();
+  }, []);
+
+  return (
+    <div>
+      <h3 className='text-center'>Top 10 Highscores:</h3>
+      <hr/>
+      {(scores != null && scores!.length == 0) ? (<h4 className='text-center'>"No scores located!"</h4>) : null}
+      {
+        scores?.map((v, i, a) => {
+          console.log()
+          return (
+            <div key={i} className="row text-center p-2">
+              <div className="col-2">
+                <h4>{i + 1}: </h4>
+              </div>
+              <div className="col-6">
+                <h4>{v[0]}</h4>
+              </div>
+              <div className="col">
+                <h4>{v[1]}</h4>
+              </div>
+            </div>
+          );
+        })
+      }
     </div>
   )
 }
@@ -634,9 +780,9 @@ function BaseLayout(props: {children: ReactNode}) {
 
   return (
     <Stack direction={(columnMode ? 'vertical' : 'horizontal') as StackDirection} gap={10} className='Horizontal-Flow align-self-center'>
-      {(columnMode && heightToSmall) ? <img src={icon} className='App-icon' alt='icon'/> : null}
+      {(columnMode && heightToSmall) ? <img src={process.env.PUBLIC_URL + '/assets/gallows_icon.png'} className='App-icon' alt='icon'/> : null}
       <Stack direction='vertical' gap={3} className='col-md-2.5 p-5 mx-auto w-10 align-self-start' children={props.children}/>
-      {(!columnMode && heightToSmall) ? <img src={icon} className='App-icon' alt='icon'/> : null}
+      {(!columnMode && heightToSmall) ? <img src={process.env.PUBLIC_URL + '/assets/gallows_icon.png'} className='App-icon' alt='icon'/> : null}
     </Stack>
   )
 }
