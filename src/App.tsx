@@ -709,14 +709,14 @@ function AppBody(props: {children: ReactNode}) {
   return (
     <div className="App" /* style={{minHeight: "750px", minWidth: "400px"}} */>
       <div className="App-body d-flex h-100 justify-content-center" children={props.children}/>
-      <Button color='blue' size='sm' ref={target} variant='success' onClick={() => setShow(!show)} style={{ height: "40px", width: "40px", marginRight: "20px", marginTop: "20px", visibility: (!show ? 'visible' : 'hidden') }} className="position-absolute top-0 end-0" title="Back to Login!">
+      <Button color='blue' size='sm' ref={target} variant='success' onClick={() => setShow(!show)} style={{ height: "40px", width: "40px", marginRight: "20px", marginTop: "20px", visibility: (!show ? 'visible' : 'hidden') }} className="position-absolute top-0 end-0" title="Open Highscores.">
         <FontAwesomeIcon icon={FA_SolidSVG.faBook} size='xl' color='white'/>
       </Button>
       <Overlay target={target.current} show={show} placement="right">
         {({ placement: _placement, arrowProps: _arrowProps, show: _show, popper: _popper, hasDoneInitialMeasure: _hasDoneInitialMeasure,}) => (
           <div className="position-absolute top-0 start-0 vw-100 vh-100 z-1" style={{backgroundColor: 'rgba(0, 0, 0, 0.3)'}}>
             <div className="position-absolute top-50 start-50 translate-middle h-50 p-3" style={{width: "360px", backgroundColor: 'rgba(200, 100, 45, 1)', color: 'white', borderRadius: 3}}>
-              <Button color='blue' size='sm' ref={target} onClick={() => setShow(!show)} style={{ height: "30px", width: "30px", marginRight: "20px", marginTop: "20px", visibility: (show ? 'visible' : 'hidden') }} className="position-absolute top-0 end-0" title="Back to Login!">
+              <Button color='blue' size='sm' ref={target} onClick={() => setShow(!show)} style={{ height: "30px", width: "30px", marginRight: "20px", marginTop: "20px", visibility: (show ? 'visible' : 'hidden') }} className="position-absolute top-0 end-0" title="Close Highscores.">
                 <FontAwesomeIcon icon={FA_SolidSVG.faClose} size='sm' color='white'/>
               </Button>
               <CreateScoreBoard/>
