@@ -14,36 +14,34 @@ const client = new MongoClient(uri, {
 
 client.connect();
 
+// Method used to get a given word set using a specific themekey from the database
 async function getThemeSetFromDB(themeKey) {
     try {
-        // Connect the client to the server	(optional starting in v4.7)
-        //await client.connect();
-        // Send a ping to confirm a successful connection
+        // Get db_hangman from the given client connection
         var db = await client.db("db_hangman");
 
+        // Get the words collection from the database
         var collection = await db.collection("words");
 
+        // Get both the easy and hard variants form the given collection
         var easyWords = await collection.find({ theme: themeKey, difficulty: "easy" }).map((entry) => entry.word).toArray();
         var hardWords = await collection.find({ theme: themeKey, difficulty: "hard" }).map((entry) => entry.word).toArray();
 
         return { easy: easyWords, hard: hardWords }
     } catch(e) {
         console.log(e);
-    } /* finally {
-        // Ensures that the client will close when you finish/error
-        await client.close();
-    }  */
+    }
 
     return { easy: [], hard: [] }
 }
 
+// Method used to get all themes from the database if possible or return empty object value
 async function getThemesFromDB() {
     try {
-        // Connect the client to the server	(optional starting in v4.7)
-        //await client.connect();
-        // Send a ping to confirm a successful connection
+        // Get db_hangman from the given client connection
         var db = await client.db("db_hangman");
 
+        // Get the themes collection from the database and then collect all themes found
         var entries = await db.collection("themes").find()
             .map((entry) => [entry.key, { name: entry.name, description: entry.description}])
             .toArray();
@@ -51,21 +49,18 @@ async function getThemesFromDB() {
         return new Map(entries);
     } catch(e) {
         console.log(e);
-    } /* finally {
-        // Ensures that the client will close when you finish/error
-        await client.close();
-    } */
+    }
 
     return new Map();
 }
 
+// Method used to get the top 10 scores from the databases users collection
 async function getTopScoresFromDB() {
-    try {
-        // Connect the client to the server	(optional starting in v4.7)
-        //await client.connect();
-        // Send a ping to confirm a successful connection
+    try {    
+        // Get db_hangman from the given client connection    
         var db = await client.db("db_hangman");
 
+        // Get the users collection to then query and find all top 10 scores within teh database
         var entries = await db.collection("users").find().sort( { score: -1 } ).limit(10)
             .map((entry) => [entry.username, entry.highscore])
             .toArray();
@@ -73,25 +68,24 @@ async function getTopScoresFromDB() {
         return new Map(entries);
     } catch(e) {
         console.log(e);
-    } /* finally {
-        // Ensures that the client will close when you finish/error
-        await client.close();
-    } */
+    }
 
     return new Map();
 }
 
+// Method used to set the given passed username with the supplied highscore within the database
 async function setScoreInDB(username, highscore) {
     try {
-        // Connect the client to the server	(optional starting in v4.7)
-        //await client.connect();
-        // Send a ping to confirm a successful connection
+        // Get db_hangman from the given client connection
         var db = await client.db("db_hangman");
 
+        // Get users DB Connection
         var collection = await db.collection("users");
 
+        // Query to get the initial data of the user if it exists
         var oldUserData = (await collection.find({ username: username }).limit(1).toArray())[0];
 
+        // Either use the old user data to update such within the db or insert such within the db
         if(oldUserData != undefined) {
             await collection.updateOne({ _id: oldUserData._id }, { $set: { username: username, highscore: highscore}}, { upsert: true });
 
@@ -105,10 +99,7 @@ async function setScoreInDB(username, highscore) {
         }
     } catch(e) {
         console.log(e);
-    } /* finally {
-        // Ensures that the client will close when you finish/error
-        await client.close();
-    } */
+    }
 
     return { hasUpdatedScore: false, highscore: -1 };
 }
@@ -116,20 +107,17 @@ async function setScoreInDB(username, highscore) {
 
 async function getScoreFromDB(username) {
     try {
-        // Connect the client to the server	(optional starting in v4.7)
-        //await client.connect();
-        // Send a ping to confirm a successful connection
+        // Get db_hangman from the given client connection
         var db = await client.db("db_hangman");
 
+        // Get users DB Connection
         var collection = await db.collection("users");
 
+        // Get user from collection to get their highscore
         return (await collection.find({ username: username }).limit(1).toArray())[0].highscore;
     } catch(e) {
         console.log(e);
-    } /* finally {
-        // Ensures that the client will close when you finish/error
-        await client.close();
-    } */
+    }
 
     return -1;
 }

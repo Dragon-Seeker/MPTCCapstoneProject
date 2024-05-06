@@ -56,7 +56,6 @@ export function GameSelection() {
   function setState(state: WordData | null) {
     setWordDataState(new Array(state));
 
-    //console.log("Attempting to setState: " + state);
     state?.toStorage();
   }
 
@@ -67,8 +66,6 @@ export function GameSelection() {
   var fileData = getState() != null ? setFileFrom(getState()!.toJSONString()) : null;
 
   var fileDataExists = fileData != null;
-  
-  //console.log(WordData.fromStorage()?.toJSONString());
 
   return (
     <AppBody>
@@ -186,9 +183,6 @@ function onUploadEvent(event: React.ChangeEvent<HTMLInputElement>, setter: (stat
     var data = WordData.fromString(fr.result as string);
 
     if(data != null) setter(data);
-
-    //console.log(data?.toString());
-    //console.log(WordData.fromStorage()?.toJSONString);
   }
 
   fr.readAsText(file);
@@ -427,6 +421,7 @@ function renderHangmanCanvas(e: HTMLCanvasElement | null, state: HangManGameStat
     amountGuess = state.currentMode.maxNumberOfGuess
   }
 
+  // Main condition checks to setup the given render state based on the guess left and the game mode selected
   if(state.currentMode == DifficultyMode.EASY) {
     if(amountGuess > 0) shownParts.push("head");
     if(amountGuess > 1) shownParts.push("body");
