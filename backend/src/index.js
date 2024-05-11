@@ -61,7 +61,7 @@ async function getTopScoresFromDB() {
         var db = await client.db("db_hangman");
 
         // Get the users collection to then query and find all top 10 scores within teh database
-        var entries = await db.collection("users").find().sort( { score: -1 } ).limit(10)
+        var entries = await db.collection("users").find().sort( { highscore: -1 } ).limit(10)
             .map((entry) => [entry.username, entry.highscore])
             .toArray();
 
